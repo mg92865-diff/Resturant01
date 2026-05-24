@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Tracker</title>
+    
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Restaurant+Tracker%22%2C%22short_name%22%3A%22RestTrack%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f8f9fa%22%2C%22theme_color%22%3A%22%23212529%22%7D">
+    
+    <script src="https://unpkg.com/dexie@4.0.1/dist/dexie.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --text-muted: #6c757d;
+            --border-color: #dee2e6;
+            --primary: #0d6efd;
+            --primary-hover: #0b5ed7;
+            --danger: #dc3545;
+            --danger-hover: #bb2d3b;
+            --success: #198754;
+            --radius: 8px;
+            --font: system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 16px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Forms and Controls */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group-inline {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-row-three {
+            display: grid;
+            grid-template-columns: 2fr 1fr auto;
+            gap: 8px;
+            align-items: end;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-muted);
+        }
+
+        input[type="text"], input[type="tel"], input[type="url"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            background-color: #fff;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 0;
+        }
+
+        .checkbox-group input {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Buttons */
+        button {
+            padding: 12px 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background 0.2s;
+            min-height: 48px; /* Android touch target guideline */
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            width: 100%;
+        }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+
+        .btn-secondary {
+            background-color: var(--border-color);
+            color: var(--text-color);
+            font-size: 0.9rem;
+            padding: 8px 12px;
+            min-height: auto;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            min-height: auto;
+        }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+
+        .backup-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* Structured Row List UI */
+        .restaurant-item {
+            display: flex;
+            flex-direction: column;
+            padding: 14px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--card-bg);
+            margin-bottom: 8px;
+            border-radius: var(--radius);
+            border-left: 5px solid var(--danger);
+        }
+
+        .restaurant-item.completed {
+            border-left-color: var(--success);
+            opacity: 0.8;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 4px;
+        }
+
+        .item-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .item-type {
+            font-size: 0.8rem;
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .item-details {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .item-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        .links-group a {
+            margin-right: 12px;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .hidden { display: none !important; }
+        
+        #fileInput { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Restaurants</h1>
+        <div class="backup-controls">
+            <button class="btn-secondary" onclick="exportBackup()">Export</button>
+            <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">Import</button>
+            <input type="file" id="fileInput" accept=".json" onchange="importBackup(event)">
+        </div>
+    </header>
+
+    <div class="card">
+        <h3 id="formTitle" style="margin-bottom:12px;">Add New Restaurant</h3>
+        <form id="restaurantForm" onsubmit="saveRestaurant(event)">
+            <input type="hidden" id="rowId">
+            
+            <div class="form-group">
+                <label for="name">Restaurant Name *</label>
+                <input type="text" id="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="address">Address</label>
+                <input type="text" id="address">
+            </div>
+
+            <div class="form-row-three form-group">
+                <div>
+                    <label for="city">City</label>
+                    <input type="text" id="city">
+                </div>
+                <div>
+                    <label for="zip">Zip Code</label>
+                    <input type="text" id="zip">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="completed">
+                    <label for="completed" style="margin-bottom:0;">Done</label>
+                </div>
+            </div>
+
+            <div class="form-group-inline">
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone">
+                </div>
+                <div class="form-group">
+                    <label for="foodType">Food Type</label>
+                    <input type="text" id="foodType" placeholder="e.g. BBQ, Italian">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="url">Website URL</label>
+                <input type="url" id="url" placeholder="https://...">
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:16px;">
+                <button type="submit" class="btn-primary" id="submitBtn">Save Entry</button>
+                <button type="button" class="btn-secondary hidden" id="cancelBtn" onclick="resetForm()">Cancel</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="restaurantList"></div>
+</div>
+
+<script>
+    // Initialize Dexie Storage Layer
+    const db = new Dexie("RestaurantDatabase");
+    db.version(1).stores({
+        restaurants: '++id, name, city, zip, foodType, completed'
+    });
+
+    const form = document.getElementById('restaurantForm');
+    const rowIdInput = document.getElementById('rowId');
+    const formTitle = document.getElementById('formTitle');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const listContainer = document.getElementById('restaurantList');
+
+    // Load elements on launch
+    document.addEventListener("DOMContentLoaded", loadRestaurants);
+
+    async function loadRestaurants() {
+        listContainer.innerHTML = '';
+        const items = await db.restaurants.toArray();
+        
+        if (items.length === 0) {
+            listContainer.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top:20px;">No restaurants logged yet.</p>`;
+            return;
+        }
+
+        items.forEach(item => {
+            const itemEl = document.createElement('div');
+            itemEl.className = `restaurant-item ${item.completed ? 'completed' : ''}`;
+            
+            // Format phone link if available
+            const phoneLink = item.phone ? `<a href="tel:${item.phone}">📞 Call</a>` : '';
+            // Format URL link if available 
+            const urlLink = item.url ? `<a href="${item.url}" target="_blank">🌐 Web</a>` : '';
+
+            itemEl.innerHTML = `
+                <div class="item-header">
+                    <div class="item-title">${escapeHtml(item.name)}</div>
+                    ${item.foodType ? `<span class="item-type">${escapeHtml(item.foodType)}</span>` : ''}
+                </div>
+                <div class="item-details">
+                    ${escapeHtml(item.address || '')}${item.city ? ', ' + escapeHtml(item.city) : ''} ${escapeHtml(item.zip || '')}
+                </div>
+                <div class="item-actions">
+                    <div class="links-group">
+                        ${phoneLink}
+                        ${urlLink}
+                    </div>
+                    <div>
+                        <button class="btn-secondary" style="padding:4px 8px; margin-right:4px;" onclick="editRestaurant(${item.id})">Edit</button>
+                        <button class="btn-danger" onclick="deleteRestaurant(${item.id})">Delete</button>
+                    </div>
+                </div>
+            `;
+            listContainer.appendChild(itemEl);
+        });
+    }
+
+    async function saveRestaurant(e) {
+        e.preventDefault();
+
+        const data = {
+            name: document.getElementById('name').value,
+            address: document.getElementById('address').value,
+            city: document.getElementById('city').value,
+            zip: document.getElementById('zip').value,
+            phone: document.getElementById('phone').value,
+            url: document.getElementById('url').value,
+            foodType: document.getElementById('foodType').value,
+            completed: document.getElementById('completed').checked
+        };
+
+        const id = rowIdInput.value;
+
+        if (id) {
+            data.id = parseInt(id);
+            await db.restaurants.put(data);
+        } else {
+            await db.restaurants.add(data);
+        }
+
+        resetForm();
+        loadRestaurants();
+    }
+
+    async function editRestaurant(id) {
+        const item = await db.restaurants.get(id);
+        if (!item) return;
+
+        rowIdInput.value = item.id;
+        document.getElementById('name').value = item.name || '';
+        document.getElementById('address').value = item.address || '';
+        document.getElementById('city').value = item.city || '';
+        document.getElementById('zip').value = item.zip || '';
+        document.getElementById('phone').value = item.phone || '';
+        document.getElementById('url').value = item.url || '';
+        document.getElementById('foodType').value = item.foodType || '';
+        document.getElementById('completed').checked = !!item.completed;
+
+        formTitle.innerText = "Edit Restaurant Entry";
+        submitBtn.innerText = "Update Entry";
+        cancelBtn.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function deleteRestaurant(id) {
+        if (confirm("Are you sure you want to delete this restaurant?")) {
+            await db.restaurants.delete(id);
+            loadRestaurants();
+            if (rowIdInput.value == id) resetForm();
+        }
+    }
+
+    function resetForm() {
+        form.reset();
+        rowIdInput.value = '';
+        formTitle.innerText = "Add New Restaurant";
+        submitBtn.innerText = "Save Entry";
+        cancelBtn.classList.add('hidden');
+    }
+
+    // Export local state to file with imbedded ISO Date string
+    async function exportBackup() {
+        const items = await db.restaurants.toArray();
+        const jsonString = JSON.stringify(items, null, 2);
+        
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        // Date Stamp string formatting (YYYY-MM-DD)
+        const dateStr = new Date().toISOString().split('T')[0];
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `restaurants_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // Parsing dynamic JSON schema back into Dexie
+    function importBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const items = JSON.parse(e.target.result);
+                if (!Array.isArray(items)) throw new Error("Data format is invalid");
+
+                if (confirm("Importing will add these entries to your library. Proceed?")) {
+                    for (const item of items) {
+                        // Strip prior structural auto-increment IDs to avoid write collisions
+                        delete item.id;
+                        await db.restaurants.add(item);
+                    }
+                    loadRestaurants();
+                    alert("Import successful!");
+                }
+            } catch (err) {
+                alert("Error importing data. Make sure it is a valid backup file.");
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; // clears state context
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // Standard local inline register of context worker for local PWA criteria satisfaction
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('data:text/javascript,self.addEventListener("fetch",()=>{}).');
+    }
+</script>
+
+</body>
+</html>
